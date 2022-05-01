@@ -9,8 +9,10 @@ SET(LIB_SRC src/bufprintf.c
             src/vevent.c
             src/vlog_syslog.c
             src/vlog_vapi.c
-            #src/vlog.c
-            #src/vlog_opentracing.c
+            src/vlog.c
+            src/vlog_dbg.c
+            #src/vlog_format.cpp
+            src/vlog_opentracing.c
             src/vloop_demand_event.c
             src/vlist.c
             src/vmem.c
@@ -26,7 +28,8 @@ SET(LIB_SRC src/bufprintf.c
             src/vtnd_console.c
             src/vtnd_file.c
             src/vtnd_log.c
-            src/vloop.c)
+            src/vloop.c
+            src/param_json.cpp)
             #src/unixthread.cpp)
 
 ADD_LIBRARY(vapi_static STATIC ${LIB_SRC})
@@ -35,4 +38,4 @@ ADD_LIBRARY(vapi_share SHARED ${LIB_SRC})
 SET_TARGET_PROPERTIES(vapi_static PROPERTIES OUTPUT_NAME "vapi")
 SET_TARGET_PROPERTIES(vapi_share PROPERTIES OUTPUT_NAME "vapi")
 
-#add_subdirectory (example)
+add_subdirectory (example)

@@ -189,7 +189,6 @@ int vtnd_log_server_start(const char *service_name, vtnd_log_serv_cb recv_cb, vt
 
 /**********************************************************************************************************************/
 
-
 int vtnd_log_client_start(const char *service_name)
 {
     int ret = 0;

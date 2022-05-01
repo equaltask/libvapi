@@ -21,7 +21,7 @@
 #include <libvapi/vfs.h>
 //#include <libvapi/yconfig_json.h>
 //#include <libvapi/ycov.h>
-//#include <libvapi/ytnd_log.h>
+#include <libvapi/vtnd_log.h>
 #include <libvapi/vtnd.h>
 #include <libvapi/vtnd_file.h>
 #include <libvapi/vloop_demand_event.h>
@@ -30,8 +30,9 @@
 
 //#include "data/generated/vloop_cmdline.h"
 #include "vlog_core.h"
-#include "vsignal.h"
 #include "vlog_vapi.h"
+#include "vlog_dbg.h"
+#include "vsignal.h"
 #include "vtnd_console.h"
 #include "vmem_pool.h"
 //#include "ynotify_internal.h"
@@ -39,14 +40,6 @@
 //#include "yproto_dbg.h"
 //#include "s6_supervision.h"
 #include "vloop_internal.h"
-
-#define MAX_BUILD_NAME_LEN 32
-#define MAX_EXECUTABLE_NAME_LEN 64
-#define MAX_PATH_LEN 512
-
-#ifndef VAPI_DEFAULT_CONFIG
-#define VAPI_DEFAULT_CONFIG ""
-#endif
 
 #ifndef VAPI_DEFAULT_CMD_FILE
 #define VAPI_DEFAULT_CMD_FILE ""
@@ -269,20 +262,17 @@ struct event_base *vloop_main_init(int argc, char *argv[])
     vlog_set_default_threshold(VLOG_LOGFILE_INDEX, VLOG_DEBUG, VLOG_INTERNAL);
     vlog_set_static_tags();
 
-    if (vlog_vapi_init() != 0) {
+    if (vlog_vapi_init() != 0)
         return NULL;
-    }
 
     struct event_base *base_loop = vloop_init(4);
-    if (!base_loop) {
+    if (!base_loop)
         return NULL;
-    }
 
     vloop_dbg_init(NULL, NULL);
 
-    if (vlog_init() != 0) {
+    if (vlog_init() != 0)
         return NULL;
-    }
 
 #define YINIT_MOD(__mod)  do {                                                            \
           int __rc = __mod ## _init();                                                      \
@@ -553,9 +543,9 @@ int event_process_loop(struct event_base *base_loop)
 
         // If in the context of the action callbacks a new callback is registered,
         // we call the eventloop in a non-blocking way.
-        if (vloop_action_process(vloop)) {
+        if (vloop_action_process(vloop))
             flags |= EVLOOP_NONBLOCK;
-        }
+
         vloop->stats.loop_cnt++;
         rc = event_base_loop(base_loop, flags);
     } while (rc == 0);
@@ -880,6 +870,12 @@ static int get_cmd(char *cmd, char *args, void *ctx)
         vdbg_printf("logging disabled\n");
 
     return 0;
+}
+
+const char* vloop_get_application_name(void)
+{
+    static char *appName = "app_name";
+    return appName;
 }
 
 static int register_dbg_interface(void)

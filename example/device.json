@@ -1,0 +1,24 @@
+{
+    "chip": {
+        "device_name": "rembrandt",
+        "product_name": "Rembrandt",
+        "device_type": "apu",
+        "addr_lib_features": [13, 146, 32],
+
+        "gpu_param": {
+            "device_id": [5709, 5761],
+            "feature": [
+                "DeviceWithCapabilities",
+                "DeviceWithDoorbells",
+                "DeviceWithPhysicalMemory",
+                "DeviceWithNoVirtualMemory"
+            ],
+            "root_complex_devid": 5301,
+            "bridge_devid": [5304, 5305, 5306]
+        },
+        "cpu_param": {
+            "base_model": [0, 4]
+        }
+    }
+}
+

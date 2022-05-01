@@ -133,7 +133,7 @@ static inline void _terminate(vsystem_command_t *cmd, vevent_reason_t reason, in
 }
 
 /**
- * Callback connected to ysignal.
+ * Callback connected to vsignal.
  *
  * This is called whenever a SIGCHLD signal is received
  *
@@ -231,9 +231,8 @@ static void _timeout_handler(vevent_reason_t reason, void *ctx)
     cmd->hat_event = NULL;
     cmd->event_reason = reason;
 
-    if (kill(cmd->pid, SIGKILL) != 0) {
+    if (kill(cmd->pid, SIGKILL) != 0)
         vapi_warning("Could not kill pid %d : '%s'", cmd->pid, strerror(errno));
-    }
 }
 
 /**
@@ -281,10 +280,6 @@ int vsystem_init(void)
 void vsystem_unset_supervisor_env(void)
 {
     unsetenv("S6_NOTIFICATION_FD");
-    unsetenv("ISAM_WATCHDOG");
-    unsetenv("ISAM_APP_NAME");
-    unsetenv("ISAM_APP_INSTANCE");
-    unsetenv("ISAM_ESCALATION_LEVEL");
 }
 
 /**
@@ -401,16 +396,16 @@ vevent_t *vsystem_exec1(char **command, vsystem_terminate_cb_t on_terminate, vsy
         return NULL;
     }
 
-    if (vmutex_lock(&g_cmdlist_lock) != 0) {
+    if (vmutex_lock(&g_cmdlist_lock) != 0)
         vapi_error("Unable to acquire lock!");
-    }
+
     vlist_add_tail(&g_commands, &new_cmd->node);
 
-    if (vmutex_unlock(&g_cmdlist_lock) != 0) {
+    if (vmutex_unlock(&g_cmdlist_lock) != 0)
         vapi_error("Unable to release lock!");
-    }
 
-    if (child_pid) *child_pid = new_cmd->pid;
+    if (child_pid)
+        *child_pid = new_cmd->pid;
 
     return new_cmd->hat_event;
 }
@@ -428,9 +423,8 @@ int vsystem_execvp(const char *file, char *const argv[])
 
 void vsystem_exit(int status)
 {
-    if (status != VAPI_SUCCESS) {
+    if (status != VAPI_SUCCESS)
         vapi_critical("Application exit called with error status: %d", status);
-    }
 
     exit(status);
 }
@@ -560,7 +554,6 @@ static void vsystem_release_cmd(vsystem_command_t *cmd)
  * \param pid_out         OUT pid of target command.
  * \return A vevent handle on success, NULL on failure
  */
-
 vevent_t *vsystem_exec_extend(char **command, char **env, char *work_dir,
                               vsystem_terminate_cb_t on_terminate,
                               vsystem_cgroup_cb_t cgroup_cb,
@@ -601,11 +594,8 @@ vevent_t *vsystem_exec_extend(char **command, char **env, char *work_dir,
             return NULL;
         }
     }
-
-    else if (redirect_stdout >= 0) {
+    else if (redirect_stdout >= 0)
         new_cmd->fd[1] = redirect_stdout;
-    }
-
     else {
         new_cmd->fd[1] = open("/dev/null", O_WRONLY | O_CLOEXEC);
         if (new_cmd->fd[1] == -1) {
@@ -631,11 +621,9 @@ vevent_t *vsystem_exec_extend(char **command, char **env, char *work_dir,
             return NULL;
         }
     }
-
     else if (redirect_stderr >= 0) {
         new_cmd->fd_stderr[1] = redirect_stderr;
     }
-
     else {
         new_cmd->fd_stderr[1] = open("/dev/null", O_WRONLY | O_CLOEXEC);
         if (new_cmd->fd_stderr[1] == -1) {
@@ -707,10 +695,12 @@ pid_t vsystem_getpid_by_name(const char *name)
     snprintf(cmd, sizeof(cmd), "pidof %s", name);
     FILE *fp = popen(cmd, "re");
     if (!fp) return -1;
+
     char line[15] = {0};
     fgets(line, 15, fp);
     int stat = pclose(fp);
     if (stat != 0) return -1;
+
     pid_t pid = strtoul(line, NULL, 10);
     return pid;
 }

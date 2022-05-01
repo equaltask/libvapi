@@ -11,11 +11,10 @@
 
 #include <libvapi/vlog.h>
 #include <libvapi/vmutex.h>
-//#include <libvapi/yconfig_json.h>
 #include <libvapi/vtime.h>
 #include <libvapi/vmem.h>
-#include <libvapi/vthread.h> // vthread_getselfname
-#include <libvapi/vloop.h> // vloop_get_application_name
+#include <libvapi/vthread.h>
+#include <libvapi/vloop.h>
 #include <libvapi/vlog_file.h>
 #include <libvapi/vtnd.h>
 #include <libvapi/vtnd_log.h>
@@ -24,7 +23,7 @@
 #include "vlog_core.h"
 #include "vlog_syslog.h"
 #include "vlog_format.h"
-//#include "vlog_dbg.h"
+#include "vlog_dbg.h"
 #include "verror.h"
 #include "bufprintf.h"
 //#include "generated/vlog_tags_values.h"
@@ -247,8 +246,6 @@ void vlog_output_trace(const char *span_name, const char *msg)
     memset(module_output, 0, sizeof(module_output));
 
     bufinit(&buf, module_output, sizeof(module_output));
-    get_module_by_id(vlog_tags.TAG_MODULE, &mod);
-    vlog_format(&buf, mod ? mod->m_format : NULL, msg, &vlog_tags);
 
     if (vlog_format_trace(output, sizeof(output), module_output, VLOG_CONSOLE_INDEX) == 0)
         fputs(output, stdout);
@@ -281,21 +278,12 @@ static void vlog_fulldump_output_trace(const char *msg)
     int msg_len = -1;
     int syslog_pri = c_syslog_local1_fac;
 
-    get_module_by_id(vlog_tags.TAG_MODULE, &mod);
-    msg_len = vlog_format_get_len(mod ? mod->m_format : NULL, msg, &vlog_tags);
-    if (msg_len == -1) {
-        vapi_error("vlog_format_get_len failed");
-        return;
-    }
-
     module_output = vmem_calloc(vmem_alloc_default(), msg_len + 2);  /* '\n' + '\0' */
     if (module_output == NULL) {
         vapi_error("vmem_calloc failed");
         return;
     }
     bufinit(&buf, module_output, msg_len + 2);  /* '\n' + '\0' */
-
-    vlog_format(&buf, mod ? mod->m_format : NULL, msg, &vlog_tags);
 
     if (vlog_fulldump_format_trace(&output, module_output, VLOG_CONSOLE_INDEX) == 0) {
         fputs(output, stdout);
@@ -547,140 +535,6 @@ static int vlog_core_open(void)
     return status;
 }
 
-static int set_module_json_config(const char module_name[VLOG_MAX_MOD_NAME], vlog_id_t *log_id)
-{
-    int r, rc = -1;
-    struct yconfig_json *json_ctx;
-    char level_str[MAX_OUTPUT_LEVEL_LEN];
-    char format_str[MAX_OUTPUT_FORMAT_LEN];
-    char node[VLOG_MAX_MOD_NAME+24];
-    vlog_level_t level;
-
-    json_ctx = yconfig_json_get_ctx();
-    if (json_ctx == NULL)
-        return -1;
-
-    r = snprintf(node, sizeof(node), "vlog.modules.%s.threshold", module_name);
-    if (r > 0 && (unsigned)r < sizeof(node)) {
-        r = yconfig_json_value_get_str(json_ctx, node, level_str, MAX_OUTPUT_LEVEL_LEN);
-        if (r == 0) {
-            level = vlog_level_from_str(level_str);
-            if (level != 0) {
-                rc = vlog_module_config_loglevel(*log_id, level);
-            }
-        }
-    }
-
-    r = snprintf(node, sizeof(node), "vlog.modules.%s.format", module_name);
-    if (r > 0 && (unsigned)r < sizeof(node)) {
-        r = yconfig_json_value_get_str(json_ctx, node, format_str, MAX_OUTPUT_FORMAT_LEN);
-        if (r == 0) {
-            rc = vlog_module_set_format(*log_id, format_str);
-        }
-    }
-
-    return rc;
-}
-
-/* loads logging configuration from passed file */
-static int vlog_core_load_config(struct yconfig_json *json_ctx)
-{
-    int ret = 0;
-    char level[MAX_OUTPUT_LEVEL_LEN] = "";
-    char format[MAX_OUTPUT_FORMAT_LEN] = "";
-    int i = 0;
-
-    ret = vmutex_lock(&vlog_config_lock);
-    if (ret != 0)
-        return -1;
-
-    if (_log_is_initialized() == false) {
-       vapi_warning("error: vlog not initialized yet [%s]",__func__);
-       ret = -1;
-       goto exit_vlog_config_load;
-    }
-
-    /* set log levels */
-    const char *vlog_level_cfg[] = {
-        "vlog.outputs.file.threshold",
-        "vlog.outputs.syslog.threshold",
-        "vlog.outputs.console.threshold",
-        "vlog.outputs.tndd.threshold",
-        "vlog.outputs.opentracing.threshold"
-    };
-
-    for (i = 0; i < VLOG_DEST_MAX - 1; ++i) {
-        if (i != VLOG_ERRORFILE_INDEX) {
-            yconfig_json_value_get_str(json_ctx, vlog_level_cfg[i], level, MAX_OUTPUT_LEVEL_LEN);
-
-            int ret = 0;
-            if (strncmp(VLOG_DISABLED_STR, level, MAX_OUTPUT_LEVEL_LEN) == 0)
-                ret = vlog_output_set_loglevel(i, VLOG_DISABLED);
-            else if (strncmp(VLOG_CRITICAL_STR, level, MAX_OUTPUT_LEVEL_LEN) == 0)
-                ret = vlog_output_set_loglevel(i, VLOG_CRITICAL);
-            else if (strncmp(VLOG_ERROR_STR, level, MAX_OUTPUT_LEVEL_LEN) == 0)
-                ret = vlog_output_set_loglevel(i, VLOG_ERROR);
-            else if (strncmp(VLOG_WARNING_STR, level, MAX_OUTPUT_LEVEL_LEN) == 0)
-                ret = vlog_output_set_loglevel(i, VLOG_WARNING);
-            else if (strncmp(VLOG_INFO_STR, level, MAX_OUTPUT_LEVEL_LEN) == 0)
-                ret = vlog_output_set_loglevel(i, VLOG_INFO);
-            else if (strncmp(VLOG_DEBUG_STR, level, MAX_OUTPUT_LEVEL_LEN) == 0)
-                ret = vlog_output_set_loglevel(i, VLOG_DEBUG);
-
-            if (ret < 0)
-                vapi_error("warning: could not set output level %s for module %d", level, i);
-        }
-    }
-
-    /* set formats */
-    const char *vlog_format_cfg[] = {
-        "vlog.outputs.file.format",
-        "vlog.outputs.syslog.format",
-        "vlog.outputs.console.format",
-        "vlog.outputs.tndd.format"
-    };
-
-    for (i = 0; i < VLOG_DEST_MAX - 1; ++i) {
-        yconfig_json_value_get_str(json_ctx, vlog_format_cfg[i], format, MAX_OUTPUT_FORMAT_LEN);
-        vlog_output_set_format(i, format);
-    }
-
-    /* set vlogfile output configuration */
-    yconfig_json_value_get_str(json_ctx, "vlog.outputs.file.name", log_config.m_vlogfile.filename, VLOG_MAX_FILENAME);
-    yconfig_json_value_get_str(json_ctx, "vlog.outputs.file.directory", log_config.m_vlogfile.pathname, VLOG_MAX_FILENAME);
-    yconfig_json_value_get_int(json_ctx, "vlog.outputs.file.max_entries", &(log_config.m_vlogfile.maxentries));
-    yconfig_json_value_get_int(json_ctx, "vlog.outputs.file.max_files", &(log_config.m_vlogfile.nb_logfiles_max));
-    yconfig_json_value_get_int(json_ctx, "vlog.outputs.file.disk_spaceHWM", &(log_config.m_vlogfile.fs_size_hwm));
-    yconfig_json_value_get_int(json_ctx, "vlog.outputs.file.disk_spaceLWM", &(log_config.m_vlogfile.fs_size_lwm));
-
-    /* set yerrorfile output configuration */
-    yconfig_json_value_get_str(json_ctx, "vlog.outputs.error.name", log_config.m_yerrorfile.filename, VLOG_MAX_FILENAME);
-    yconfig_json_value_get_str(json_ctx, "vlog.outputs.error.directory", log_config.m_yerrorfile.pathname, VLOG_MAX_FILENAME);
-    yconfig_json_value_get_int(json_ctx, "vlog.outputs.error.max_entries", &(log_config.m_yerrorfile.maxentries));
-    yconfig_json_value_get_int(json_ctx, "vlog.outputs.error.max_files", &(log_config.m_yerrorfile.nb_logfiles_max));
-    yconfig_json_value_get_int(json_ctx, "vlog.outputs.error.disk_spaceHWM", &(log_config.m_yerrorfile.fs_size_hwm));
-    yconfig_json_value_get_int(json_ctx, "vlog.outputs.error.disk_spaceLWM", &(log_config.m_yerrorfile.fs_size_lwm));
-
-    yconfig_json_value_get_str(json_ctx, "vlog.outputs.syslog.local_addr", log_config.m_ysyslog.local_addr, VLOG_MAX_SYSLOG_ADDR);
-    yconfig_json_value_get_int(json_ctx, "vlog.outputs.syslog.local_port", &(log_config.m_ysyslog.local_port));
-
-    log_config.m_vlogfile.currententries = 0;
-    log_config.m_yerrorfile.currententries = 0;
-
-    /* Check to set json threshold configuration for early registered modules */
-    vlog_module_t *tmp = NULL;
-    struct vlist *nodep = NULL;
-
-    vlist_foreach(&(log_config.m_module_list),nodep) {
-        tmp = container_of(vlog_module_t, m_node, nodep);
-        set_module_json_config(tmp->m_name, (vlog_id_t *)&tmp->m_logid);
-    }
-
-exit_vlog_config_load:
-    vmutex_unlock(&vlog_config_lock);
-    return ret;
-}
-
 /* internal function for creation of log module */
 static int __vlog_module_register(const char module_name[VLOG_MAX_MOD_NAME], vlog_id_t *log_id, vlog_category_t category)
 {
@@ -703,7 +557,6 @@ static int __vlog_module_register(const char module_name[VLOG_MAX_MOD_NAME], vlo
     strncpy(new_mod->m_name, module_name, VLOG_MAX_MOD_NAME-1);
     new_mod->m_logid = log_config.m_nbr_modules;
     new_mod->m_level = log_config.m_default_loglevel;
-    new_mod->m_format = NULL;
     new_mod->m_update_ctx = NULL;
     new_mod->m_category = category;
     log_config.m_nbr_modules++; /* incremented with every registered module */
@@ -729,7 +582,7 @@ int vlog_module_register(const char module_name[VLOG_MAX_MOD_NAME], vlog_id_t *l
     if (ret != 0)
         goto exit_register;
 
-    set_module_json_config(module_name, log_id);
+    //set_module_json_config(module_name, log_id);
 
 exit_register:
     return ret;
@@ -825,8 +678,6 @@ void vlog_set_default_threshold(vlog_output_t output, vlog_level_t thresh, vlog_
 /* main init fuction, to be called once during main init (vloop) */
 int vlog_init(void)
 {
-    struct yconfig_json *json_ctx = NULL;
-
     if (_log_is_initialized()) // already initialized
         return 0;
 
@@ -834,13 +685,6 @@ int vlog_init(void)
     vlog_tags_clear();
 
     log_config.m_initialized = 1;
-
-    /* if json_ctx initialized, read and initialize vlog_internal_config */
-    json_ctx = yconfig_json_get_ctx();
-    if (json_ctx == NULL)
-        vapi_info("application uses default vlog configuration\n");
-    else
-        vlog_core_load_config(json_ctx);
 
     /* in case the default threshold is lower than the console or file threshold, enable it (e.g. --debug) */
     if (log_config.m_default_loglevel > log_config.m_destlevel[VLOG_CONSOLE_INDEX]) {
@@ -1109,7 +953,7 @@ int vlog_module_get_data(vlog_id_t id, char name[VLOG_MAX_MOD_NAME], int *level,
 
     strcpy(name, mod->m_name);
     *level = mod->m_level;
-    *format = vlog_format_get_string(mod->m_format);
+    *format = "";//vlog_format_get_string(mod->m_format);
 
     return 0;
 }
@@ -1251,12 +1095,12 @@ int vlog_module_set_format(vlog_id_t id, const char *fmt_str)
         return 1;
     }
 
-    old = mod->m_format;
+    //old = mod->m_format;
     pnew = vlog_format_compile(fmt_str, 0);
     if (pnew == NULL)
         return 1;
 
-    mod->m_format = pnew;
+    //mod->m_format = pnew;
     if (old != NULL)
         vlog_format_free(old);
 
@@ -1344,7 +1188,7 @@ int vlog_register_operator_syslog(const char syslog_module_name[VLOG_MAX_MOD_NAM
     if (ret != 0)
         goto exit_register;
 
-    set_module_json_config(syslog_module_name, log_id);
+    //set_module_json_config(syslog_module_name, log_id);
 
 exit_register:
     return ret;

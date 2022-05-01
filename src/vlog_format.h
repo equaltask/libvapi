@@ -2,7 +2,7 @@
 #ifndef __VLOG_FORMAT_H__
 #define __VLOG_FORMAT_H__
 
-#include "bufprintf.h" // buffer_t
+#include "bufprintf.h"
 //#include "generated/vlog_tags_values.h" // vlog_tags_t
 
 #ifdef __cplusplus

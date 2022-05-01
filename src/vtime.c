@@ -128,8 +128,8 @@ int vtime_convert_wallclock_time_t(struct tm *time, time_t *timep)
         vapi_error("%s failed : %s", __func__, strerror(errno));
         return -1;
     }
-    *timep = time_converted;
 
+    *timep = time_converted;
     return 0;
 }
 
@@ -155,13 +155,11 @@ int vtime_set_wallclock_tm(struct tm *time)
      */
     ts.tv_sec = mktime(time);
     ts.tv_nsec = 0;
-
     if (ts.tv_sec == -1) {
         // wrong date input
         return -1;
     }
-
-    if (ts.tv_sec < -1) {
+    else if (ts.tv_sec < -1) {
         // date before EPOCH, we cannot update REALTIME CLOCK with such value
         return -2;
     }
@@ -238,13 +236,11 @@ static void _on_terminate_tz(vevent_reason_t reason, int status, void *cookie)
 {
     struct _vtime_ctx *ctx = (struct _vtime_ctx *)cookie;
 
-    if (reason != VEVENT_OCCURED) {
+    if (reason != VEVENT_OCCURED)
         vapi_error("Timezone modification failed (reason = %d / status = %d).", reason, status);
-    }
 
-    if (ctx->user_cb) {
+    if (ctx->user_cb)
         ctx->user_cb(reason, ctx->user_ctx);
-    }
 
     vmem_free(vmem_alloc_default(), ctx);
 }
@@ -319,13 +315,12 @@ int vtime_valid_timezone_offset(int tz_offset)
     // check that file exist /usr/share/zoneinfo/...
     struct stat buffer;
     char filename[255] = {0};
-    if (tz_offset < 0) {
+    if (tz_offset < 0)
         snprintf(filename, 254, "/usr/share/zoneinfo/Etc/GMT+%i", -tz_offset);
-    } else if (tz_offset == 0) {
+    else if (tz_offset == 0)
         snprintf(filename, 254, "/usr/share/zoneinfo/Etc/GMT");
-    } else {
+    else
         snprintf(filename, 254, "/usr/share/zoneinfo/Etc/GMT-%i", tz_offset);
-    }
 
     int rc = stat(filename, &buffer);
     if (rc == 0) {
@@ -376,7 +371,6 @@ int vtime_register_update_cb(vtime_update_cb_t on_update, void *user_ctx)
 {
     struct timespec ts;
     vtime_update_ctx_t *update_ctx = (struct vtime_update_ctx *)vmem_calloc(vmem_alloc_default(), sizeof(struct vtime_update_ctx));
-
     if (update_ctx == NULL) {
         vapi_error("%s: failed memory allocation", __func__);
         return -1;
@@ -384,9 +378,8 @@ int vtime_register_update_cb(vtime_update_cb_t on_update, void *user_ctx)
 
     memset(update_ctx, 0, sizeof(vtime_update_ctx_t));
 
-    if (vtime_get_wallclock(&ts) != 0) {
+    if (vtime_get_wallclock(&ts) != 0)
         vapi_error("%s: failed to retrieve wallclock time", __func__);
-    }
 
     update_ctx->update_cb = on_update;
     update_ctx->user_ctx = user_ctx;

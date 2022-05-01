@@ -117,8 +117,6 @@ static int verror_format_record(char output[VERROR_MAX_RECORD_SIZE], vlog_level_
         bufprintf_asyncsignalsafe(&out_buf, "error type       : %lx\n", type);
     }
     bufprintf_asyncsignalsafe(&out_buf, "user name        : %s\n", app);
-    bufprintf_asyncsignalsafe(&out_buf, "build name       : %s\n", vloop_get_build_name());
-    bufprintf_asyncsignalsafe(&out_buf, "executable name  : %s\n", vloop_get_executable_name());
     bufprintf_asyncsignalsafe(&out_buf, "file name        : %s\n", file);
     bufprintf_asyncsignalsafe(&out_buf, "line number      : %d\n", line);
 
@@ -151,9 +149,8 @@ int verror_vstr(char output[VERROR_MAX_RECORD_SIZE], vlog_level_t level, unsigne
                 const char *app, const char *file, int line,
                 int async_signal_safe, const char *format, va_list arg)
 {
-    int nc;
     char format_buffer[400];
-    nc = vsnprintf(format_buffer, sizeof(format_buffer), format, arg);
+    int nc = vsnprintf(format_buffer, sizeof(format_buffer), format, arg);
     return verror_format_record(output, level, type, app, file, line, async_signal_safe, format_buffer, nc, string_formatter);
 }
 
